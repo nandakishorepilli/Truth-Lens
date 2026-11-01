@@ -1,0 +1,5 @@
+{"_note": "SAMPLE DATA for demonstration only.",
+ "question": "When was the Eiffel Tower completed?",
+ "answer": "The Eiffel Tower was completed in 1889. The tower is 330 metres tall. The Eiffel Tower was completed in 1925.",
+ "sources": [{"id": "S1", "title": "Sample encyclopedia entry",
+              "text": "The Eiffel Tower was completed in 1889. It is located in Paris, France. The tower is 330 metres tall."}]}
