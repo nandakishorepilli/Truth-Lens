@@ -31,7 +31,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    cors_env = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173")
+    cors_env = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
     origins = parse_origins(cors_env)
     if origins:
         application.add_middleware(

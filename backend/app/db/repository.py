@@ -75,6 +75,23 @@ def get_evaluation_record(db: Session, run_id: str) -> EvaluationRecord | None:
     return db.query(EvaluationRecord).filter(EvaluationRecord.run_id == run_id).first()
 
 
+def list_evaluation_records(
+    db: Session,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[EvaluationRecord], int]:
+    """Return a page of evaluation records (newest first) and the total count."""
+    total: int = db.query(EvaluationRecord).count()
+    records = (
+        db.query(EvaluationRecord)
+        .order_by(EvaluationRecord.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return records, total
+
+
 def record_to_evaluation_report(record: EvaluationRecord) -> EvaluationReport:
     """Reconstruct an EvaluationReport domain dataclass from an EvaluationRecord."""
     sources = [

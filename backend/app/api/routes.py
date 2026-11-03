@@ -11,9 +11,10 @@ from app.api.schemas import (
     ProvidersResponse,
     VerifierConfigInput,
 )
-from app.core.config import provider_statuses
+from app.core.config import PROVIDER_SPECS, provider_statuses
 from app.db.repository import (
     get_evaluation_record,
+    list_evaluation_records,
     record_to_evaluation_report,
     save_evaluation_report,
 )
@@ -21,10 +22,12 @@ from app.db.session import get_db
 from app.evaluation.models import InputError
 from app.evaluation.pipeline import EvaluationConfig, run_evaluation
 from app.evaluation.verify import LLMVerifier, RuleBasedVerifier
-from app.providers.mock import MockProvider
+from app.providers.mock import MockProvider, UnconfiguredProvider
+from app.providers.registry import IMPLEMENTED_PROVIDER_IDS, ProviderRegistry
 from app.reporting.export import report_to_csv, report_to_dict, report_to_json
 
 router = APIRouter()
+VALID_PROVIDER_NAMES: frozenset[str] = frozenset(s.name for s in PROVIDER_SPECS)
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -62,10 +65,62 @@ async def create_evaluation(
     elif cfg.verifier_type == "mock":
         provider = MockProvider(script=cfg.mock_responses or ["{}"])
         verifier = LLMVerifier(provider=provider)
+    elif cfg.verifier_type == "llm":
+        provider_id = (cfg.provider_id or "").strip()
+        if not provider_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="provider_id is required when verifier_type is 'llm'.",
+            )
+        if cfg.model_id is not None:
+            model_id = cfg.model_id.strip()
+            if not model_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="model_id cannot be empty when specified.",
+                )
+        if provider_id not in VALID_PROVIDER_NAMES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Unknown provider '{provider_id}'. "
+                    f"Supported providers: {', '.join(sorted(IMPLEMENTED_PROVIDER_IDS))}."
+                ),
+            )
+        if provider_id not in IMPLEMENTED_PROVIDER_IDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Provider '{provider_id}' adapter is not implemented yet. "
+                    f"Implemented adapters: {', '.join(sorted(IMPLEMENTED_PROVIDER_IDS))}."
+                ),
+            )
+        registry = ProviderRegistry.from_env()
+        provider = registry.get(provider_id)
+        if isinstance(provider, UnconfiguredProvider):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Provider '{provider_id}' is not configured. "
+                    "Set the required environment variables and restart the server. "
+                    "Check GET /api/providers for configuration status."
+                ),
+            )
+        if cfg.model_id is not None:
+            provider.model = cfg.model_id.strip()
+        if not provider.model or not str(provider.model).strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Provider '{provider_id}' has no model configured. "
+                    "Specify a non-empty model_id in the request or set the model environment variable."
+                ),
+            )
+        verifier = LLMVerifier(provider=provider)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported verifier type '{cfg.verifier_type}'. Supported: 'rule_based', 'mock'.",
+            detail=f"Unsupported verifier type '{cfg.verifier_type}'. Supported: 'rule_based', 'mock', 'llm'.",
         )
 
     eval_cfg = EvaluationConfig(
@@ -102,6 +157,34 @@ async def create_evaluation(
         )
 
     return report_to_dict(report)
+
+
+@router.get("/evaluations")
+def list_evaluations(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> dict:
+    """List evaluation summaries, newest first, with pagination."""
+    records, total = list_evaluation_records(db, limit=limit, offset=offset)
+    items = []
+    for r in records:
+        m = r.metrics_data or {}
+        items.append({
+            "run_id": r.run_id,
+            "created_at": r.created_at,
+            "status": r.status,
+            "question": r.question[:200],  # truncated for list view
+            "metrics": {
+                "total_claims": m.get("total_claims", 0),
+                "supported": m.get("supported", 0),
+                "contradicted": m.get("contradicted", 0),
+                "insufficient_evidence": m.get("insufficient_evidence", 0),
+                "errors": m.get("errors", 0),
+            },
+            "config": r.config_data,
+        })
+    return {"total": total, "offset": offset, "limit": limit, "items": items}
 
 
 @router.get("/evaluations/{run_id}")

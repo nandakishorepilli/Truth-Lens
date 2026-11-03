@@ -14,6 +14,7 @@ _SECRET_PATTERN = re.compile(
     r"|gsk_[A-Za-z0-9]{16,}"
     r"|xai-[A-Za-z0-9]{16,}"
     r"|Bearer\s+[A-Za-z0-9._\-]{8,}"
+    r"|(?<=[?&]key=)[^&\s\"'<>]+"
 )
 _SENSITIVE_HEADERS = {
     "authorization", "proxy-authorization", "x-api-key", "x-goog-api-key", "api-key",

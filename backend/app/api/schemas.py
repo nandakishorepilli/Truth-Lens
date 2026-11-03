@@ -13,9 +13,12 @@ class SourceInput(BaseModel):
 
 
 class VerifierConfigInput(BaseModel):
-    verifier_type: Literal["rule_based", "mock"] = "rule_based"
+    verifier_type: Literal["rule_based", "mock", "llm"] = "rule_based"
     max_concurrency: int = Field(default=4, ge=1, le=20)
     mock_responses: list[str] | None = None
+    # LLM verifier options (only used when verifier_type == "llm")
+    provider_id: str | None = Field(default=None, description="Provider ID: gemini, groq, openrouter, ollama")
+    model_id: str | None = Field(default=None, description="Override the configured model for this request")
 
 
 class EvaluationCreateRequest(BaseModel):

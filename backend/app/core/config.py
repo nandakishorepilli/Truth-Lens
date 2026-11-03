@@ -28,8 +28,8 @@ PROVIDER_SPECS: tuple[ProviderSpec, ...] = (
     ProviderSpec("ollama", None, "OLLAMA_MODEL", base_url_env="OLLAMA_BASE_URL"),
 )
 
-# Real HTTP adapters land in Milestone 3.
-IMPLEMENTED_ADAPTERS: frozenset[str] = frozenset()
+# Milestone 3A: real HTTP adapters for these four providers are implemented.
+IMPLEMENTED_ADAPTERS: frozenset[str] = frozenset({"gemini", "groq", "openrouter", "ollama"})
 
 
 def load_env_file(path: str | Path, env: dict[str, str] | None = None) -> None:

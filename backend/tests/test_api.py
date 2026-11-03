@@ -261,6 +261,40 @@ class ApiTests(unittest.TestCase):
         res4 = self.client.get(f"/api/evaluations/{run_id}/export")
         self.assertEqual(res4.status_code, 422)
 
+    def test_list_evaluations(self):
+        # Empty list initially
+        res = self.client.get("/api/evaluations")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["total"], 0)
+        self.assertEqual(data["items"], [])
+
+        # Create two evaluations
+        payload1 = {
+            "question": "First question?",
+            "answer": "First answer with factual content.",
+            "sources": [{"id": "S1", "text": "First answer with factual content."}],
+        }
+        payload2 = {
+            "question": "Second question?",
+            "answer": "Second answer with factual content.",
+            "sources": [{"id": "S1", "text": "Second answer with factual content."}],
+        }
+        self.client.post("/api/evaluations", json=payload1)
+        self.client.post("/api/evaluations", json=payload2)
+
+        res2 = self.client.get("/api/evaluations?limit=10&offset=0")
+        self.assertEqual(res2.status_code, 200)
+        data2 = res2.json()
+        self.assertEqual(data2["total"], 2)
+        self.assertEqual(len(data2["items"]), 2)
+        # Newest first
+        self.assertEqual(data2["items"][0]["question"], "Second question?")
+        self.assertEqual(data2["items"][1]["question"], "First question?")
+        self.assertIn("metrics", data2["items"][0])
+        self.assertIn("total_claims", data2["items"][0]["metrics"])
+
+
 
 if __name__ == "__main__":
     unittest.main()
