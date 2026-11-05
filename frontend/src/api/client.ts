@@ -18,7 +18,7 @@ export class ApiError extends Error {
 // In development, Vite proxy forwards /api to http://127.0.0.1:8000
 // If VITE_API_BASE_URL is explicitly set to empty or another domain, respect it.
 const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-export const API_BASE_URL = RAW_BASE_URL !== undefined ? RAW_BASE_URL : "http://127.0.0.1:8001";
+export const API_BASE_URL = RAW_BASE_URL !== undefined ? RAW_BASE_URL : "";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = API_BASE_URL ? `${API_BASE_URL.replace(/\/$/, "")}${path}` : path;
